@@ -1,13 +1,98 @@
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <math.h>
 #include <raylib.h>
 
 #define X 1000
 #define Y 800
 
+#define N_INPUTS 6
+#define EPOCS 100
+
+int vel = 4;
+int vx  = 2;
+int vy  = 2;
+
+const float h = 1e-3;
+const float rate = 1e-3;
+
+// inputs: xball, yball, vxball, vyball, yplayer, ybot
+
+
+float sigmoid(float x) {
+	return 1.f/(1.f + expf(-x));
+}
+
+float rand_float(void) {
+    return (float) rand() / (float) RAND_MAX;
+}
+
+float forward(float model[], int xball, int yball, int yplayer, int ybot) {
+    float ans;
+
+    ans += model[0] * xball;
+    ans += model[1] * yball;
+    ans += model[2] * vx;
+    ans += model[3] * vy;
+    ans += model[4] * yplayer;
+    ans += model[5] * ybot;
+
+    return sigmoid(ans);
+}
+
+float loss(float model[], int xball, int yball, int yplayer, int ybot) {
+    float e = 0.f;
+    for (int i=0; i<N_INPUTS; i++) {
+        float out = forward(model, xball, yball, yplayer, ybot);
+
+        float expected_value = vy * 2;
+
+        e += (expected_value - out) * (expected_value - out);
+    }
+    e /= N_INPUTS;
+    
+    return e;
+}
+
+void initialize_model(float model[]) {
+    for (int i=0; i<N_INPUTS; i++) {
+        model[i] = rand_float();
+    }
+}
+
+float *calc_gradient(float model[], float *gradient[], int xball, int yball, int yplayer, int ybot) {
+    float prev_loss = loss(model, xball, yball, yplayer, ybot);
+
+    for (int i=0; i<N_INPUTS; i++) {
+        model[i] += h;
+        gradient[i] = (loss(model, xball, yball, yplayer, ybot) - prev_loss) / h;
+        model[i] -= h;
+    }
+    return gradient;
+}
+
+float learn(float model[], float *gradient[]) {
+    for (int i=0; i<N_INPUTS; i++) {
+        model[i] -= rate * gradient[i];
+    }
+}
+
+void train(float model[], float *gradient[], int xball, int yball, int yplayer, int ybot) {
+    for (int i=0; i<EPOCS; i++) {
+        gradient = calc_gradient(model, gradient, xball, yball, yplayer, ybot);
+        learn(model, gradient);
+    }
+}
+
 int main() {
     InitWindow(X, Y, "AI Pong");
     SetTargetFPS(60);
+    
+    float model[N_INPUTS];
+    initialize_model(model);
+
+    float *gradient[N_INPUTS];
 
     Rectangle ai = {X - 50, Y/2 - 50, 20, 100};
     Rectangle bot = {30, Y/2 - 50, 20, 100};
@@ -15,14 +100,13 @@ int main() {
     const int size = 20;
     Rectangle ball = {X/2, Y/2, size, size};
 
-    int vx = 3;
-    int vy = 3;
-
     unsigned int ai_score = 0;
     unsigned int bot_score = 0;
 
+    train(model, gradient);
 
     while (!WindowShouldClose()) {
+
         bool game_over = false;
 
         ball.x += vx;
@@ -53,10 +137,10 @@ int main() {
             vy *= -1;
 
         if (IsKeyDown(KEY_UP))
-            ai.y -= 4;
+            ai.y -= vel;
 
         if (IsKeyDown(KEY_DOWN))
-            ai.y += 4;
+            ai.y += vel;
 
         if (CheckCollisionRecs(ai, ball) || CheckCollisionRecs(bot, ball))
             vx *= -1;
