@@ -3,10 +3,10 @@ import pygame, sys
 pygame.init()
 clock = pygame.time.Clock()
 
-width, height = 1000, 800
+width, height = 800, 600
 FPS = 60
 
-screen = pygame.display.set_mode([width, height]) # wanted size
+screen = pygame.display.set_mode([width, height])
 pygame.display.set_caption("AI Pong")
 
 
@@ -32,14 +32,6 @@ def draw_score(ai, bot):
     screen.blit(draw_ai, (width/2 - 50, 20))
     screen.blit(draw_bot, (width/2 + 50, 20))
 
-def pixelmap():
-    arr = []
-    for y in range(height):
-        for x in range(width):
-            arr.append(screen.get_at((x, y)))
-    return arr
-
-
 
 while True:
     for event in pygame.event.get():
@@ -49,7 +41,8 @@ while True:
 
     screen.fill((0,0,0))
 
-    # print(len(pixelmap()))
+    pixelmap = pygame.surfarray.array3d(screen)
+    print(len(pixelmap)*3)
 
     game_over = False;
 

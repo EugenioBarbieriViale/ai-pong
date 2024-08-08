@@ -14,84 +14,44 @@ int vel = 4;
 int vx  = 2;
 int vy  = 2;
 
-const float h = 2;
-const float rate = 1e-3;
-
-float model[N_INPUTS];
-float gradient[N_INPUTS];
-
+const float h = 1e-2;
+const float rate = 1e-2;
 
 // inputs: xball, yball, vxball, vyball, yplayer, ybot
+float inputs[N_INPUTS] = {0, 0, 0, 0, 0, 0};
 
+float model[N_INPUTS]; // Model
+
+// Gradient
+float g[N_INPUTS];
 
 float sigmoid(float x) {
-	return 1.f/(1.f + expf(-x));
+    return 1.f/(1.f + expf(-x));
 }
 
 float rand_float(void) {
     return (float) rand() / (float) RAND_MAX;
 }
 
-float forward(float model[], int xball, int yball, int yplayer, int ybot) {
-    float ans = 0;
-
-    ans += model[0] * xball;
-    ans += model[1] * yball;
-    ans += model[2] * vx;
-    ans += model[3] * vy;
-    ans += model[4] * yplayer;
-    ans += model[5] * ybot;
-
-    return sigmoid(ans);
-}
-
-float loss(float model[], int xball, int yball, int yplayer, int ybot) {
-    float e = 0.f;
-    for (int i=0; i<N_INPUTS; i++) {
-        float out = forward(model, xball, yball, yplayer, ybot);
-
-        float expected_value = vy * 2;
-
-        e += (expected_value - out) * (expected_value - out);
-    }
-    e /= N_INPUTS;
-    
-    return e;
-}
-
-float *init_model(float model[]) {
-    for (int i=0; i<N_INPUTS; i++) {
+void init_model(float model[]) {
+    for (int i=0; i<N_INPUTS; i++)
         model[i] = rand_float();
-    }
-    return model;
 }
 
-float *applay_diff(float model[], float gradient[]) {
-    for (int i=0; i<N_INPUTS; i++) {
-        model[i] -= rate * gradient[i];
-    }
-    return model;
-}
+float forward(float model[]) {
+    float ans = 0;
+    float b = rand_float();
 
-float *calc_gradient(float model[], int xball, int yball, int yplayer, int ybot) {
-    float prev_loss = loss(model, xball, yball, yplayer, ybot);
-
-    for (int i=0; i<N_INPUTS; i++) {
-        model[i] += h;
-        /* printf("%f %f\n", loss(model, xball, yball, yplayer, ybot), prev_loss); */
-        gradient[i] = (loss(model, xball, yball, yplayer, ybot) - prev_loss) / h;
-        model[i] -= h;
-    }
-    return gradient;
+    for (int i=0; i<N_INPUTS; i++)
+        ans += (model[i] * inputs[i]);
+    return sigmoid(ans*1e-3 + b);
 }
 
 int main() {
     InitWindow(X, Y, "AI Pong");
     SetTargetFPS(60);
     
-    float *m;
-    m = init_model(model);
-    float *g;
+    init_model(model);
 
     Rectangle ai = {X - 50, Y/2 - 50, 20, 100};
     Rectangle bot = {30, Y/2 - 50, 20, 100};
@@ -103,6 +63,13 @@ int main() {
     unsigned int bot_score = 0;
 
     while (!WindowShouldClose()) {
+
+        inputs[0] = ball.x/100;
+        inputs[1] = ball.y/100;
+        inputs[2] = vx;
+        inputs[3] = vy;
+        inputs[4] = ai.y/100;
+        inputs[5] = bot.y/100;
 
         bool game_over = false;
 
@@ -133,26 +100,19 @@ int main() {
         if (ball.y <= 0 || ball.y >= Y-size)
             vy *= -1;
 
-        g = calc_gradient(m, ball.x, ball.y, ai.y, bot.y);
-        m = applay_diff(m, g);
-
-        float dir = forward(model, ball.x, ball.y, ai.y, bot.y);
-
-        /* printf("%f\n", loss(model, ball.x, ball.y, ai.y, bot.y)); */
-        printf("%f\n", gradient[3]);
-        ai.y += dir;
-
-        /* if (IsKeyDown(KEY_UP)) */
-        /*     ai.y -= vel; */
-
-        /* if (IsKeyDown(KEY_DOWN)) */
-        /*     ai.y += vel; */
-
         if (CheckCollisionRecs(ai, ball) || CheckCollisionRecs(bot, ball))
             vx *= -1;
 
         bot.y += vy;
 
+
+        float dir = forward(model);
+        printf("%f\n", dir);
+
+        if (dir > 0.5)
+            ai.y += vel;
+        else
+            ai.y -= vel;
 
         BeginDrawing();
         ClearBackground(BLACK);
